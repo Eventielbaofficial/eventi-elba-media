@@ -1,0 +1,20 @@
+{
+  "descrizione": "Handle Instagram da monitorare per lo scan eventi (live music / dj set / aperitivi / serate). Devono essere account Business/Creator pubblici perche' l'API li possa leggere. Aggiornabile nel tempo.",
+  "handles": [
+    "capo.bianco.experience",
+    "elbamusicawards",
+    "club64isoladelba",
+    "deco_music_club",
+    "vinicecilia",
+    "ilconviocavoli",
+    "bleep_cocktails",
+    "livemusicelba",
+    "al_garian_seccheto",
+    "sunsetbeachclubelba",
+    "mandelbar2morcone",
+    "giannino.live.music",
+    "djmagellano",
+    "jollymusicelba",
+    "acquarillii"
+  ]
+}
