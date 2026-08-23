@@ -63,8 +63,9 @@ WATERMARK_SHIFT = 0.10        # spostamento logo in basso a dx (1/10 larghezza)
 # Contrasto minimo di un accento sullo sfondo prima di usare l'altro accento.
 ACCENT_MIN_CONTRAST = 1.8
 
-# Dinamicità feed: sugli eventi in posizione dispari scambia accent1<->accent2
-# (resta tutto dentro palette.json, contrasto sempre garantito sul bg).
+# Dinamicità feed: sugli eventi in posizione dispari usa la variante di SFONDO
+# 'alt' della categoria (se definita in palette.json), es. serata azzurra /
+# aperitivo arancione. Forzabile per evento col campo "variante": base|alt.
 ALTERNATE_INVERT = True
 
 # Emoji + vibe per categoria (usati SOLO nella caption di testo)
@@ -531,10 +532,17 @@ def render(evento, palette, fmt_name, index=0):
             f"(disponibili: {', '.join(palette)})"
         )
     colors = palette[categoria]
-    if ALTERNATE_INVERT and index % 2 == 1:
-        colors = dict(colors)
-        colors["accent1"], colors["accent2"] = \
-            colors["accent2"], colors["accent1"]
+    # Alternanza SFONDO: variante 'alt' (es. serata azzurra, aperitivo
+    # arancione). Forzabile per evento con "variante": "base"/"alt";
+    # altrimenti automatica sugli eventi in posizione dispari.
+    variante = (evento.get("variante") or "").strip().lower()
+    use_alt = isinstance(colors.get("alt"), dict) and (
+        variante == "alt"
+        or (variante not in ("base", "alt")
+            and ALTERNATE_INVERT and index % 2 == 1)
+    )
+    if use_alt:
+        colors = colors["alt"]
 
     # sfondo: colore pieno + logo filigrana centrale + decorazione geometrica
     base = Image.new("RGBA", (W, H), colors["bg"])
