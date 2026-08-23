@@ -15,7 +15,16 @@
     "accent2": "#FF6B4A",
     "text": "#F4EFE4",
     "pill_bg": "#AEC9E8",
-    "pill_text": "#162D42"
+    "pill_text": "#162D42",
+    "alt": {
+      "label": "SERATA",
+      "bg": "#AEC9E8",
+      "accent1": "#2C4568",
+      "accent2": "#E86A34",
+      "text": "#162D42",
+      "pill_bg": "#162D42",
+      "pill_text": "#AEC9E8"
+    }
   },
   "aperitivo": {
     "label": "APERITIVO",
@@ -24,7 +33,16 @@
     "accent2": "#F2C14E",
     "text": "#5C3115",
     "pill_bg": "#E86A34",
-    "pill_text": "#F4E4C1"
+    "pill_text": "#F4E4C1",
+    "alt": {
+      "label": "APERITIVO",
+      "bg": "#E86A34",
+      "accent1": "#5C3115",
+      "accent2": "#F4E4C1",
+      "text": "#F4E4C1",
+      "pill_bg": "#F4E4C1",
+      "pill_text": "#5C3115"
+    }
   },
   "festa_special": {
     "label": "FESTA",
