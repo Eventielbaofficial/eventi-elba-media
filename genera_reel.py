@@ -35,10 +35,67 @@ STYLES = {
 }
 GAP = 34
 
+# Layout "agenda": e' quello del reel pinnato "La settimana all'Elba".
+# Testo allineato a SINISTRA, blocco ancorato in ALTO, sfondo unico, titolo del
+# giorno seguito da un trattino accento, ogni evento su due righe (nome in
+# grassetto + luogo/orario in accento). Nessun logo in basso a destra: solo
+# l'handle centrato, com'e' nel pinnato.
+AGENDA_STYLES = {
+    "kicker": (G.FONT_BOLD,    30, "accent1", 14),
+    "title":  (G.FONT_TITLE,  104, "text",    4),
+    "day":    (G.FONT_TITLE,   78, "text",    18),
+    "event":  (G.FONT_BOLD,    40, "text",    6),
+    "meta":   (G.FONT_REGULAR, 32, "accent2", 30),
+    "sub":    (G.FONT_REGULAR, 34, "text",    26),
+    "gold":   (G.FONT_BOLD,    34, "gold",    8),
+    "handle": (G.FONT_BOLD,    36, "sky",     8),
+    "cta":    (G.FONT_TITLE,   80, "text",    14),
+}
+RULE_W, RULE_H, RULE_GAP = 92, 6, 30      # trattino sotto il titolo del giorno
+AGENDA_TOP = 300                           # blocco ancorato in alto
+
 
 PILL_FONT_SIZE = 36
 PILL_PAD_X, PILL_PAD_Y = 40, 20
 PILL_GAP = 52          # respiro tra etichetta e blocco testo
+
+
+def render_agenda_card(colors, lines, extra):
+    """Card in stile 'agenda', allineata a sinistra e ancorata in alto."""
+    base = Image.new("RGBA", (W, H), colors["bg"])
+    base = G.draw_watermark(base, colors)
+    draw = ImageDraw.Draw(base)
+
+    colmap = dict(extra)
+    colmap.update({
+        "text": colors["text"],
+        "accent1": G.readable_accent("accent1", colors),
+        "accent2": G.readable_accent("accent2", colors),
+    })
+    x = MARGIN
+    content_w = W - 2 * MARGIN
+    y = AGENDA_TOP
+
+    for text, style in lines:
+        if style == "rule":
+            draw.rounded_rectangle([x, y, x + RULE_W, y + RULE_H],
+                                   radius=RULE_H // 2,
+                                   fill=colmap["accent2"])
+            y += RULE_H + RULE_GAP
+            continue
+        fname, size, ckey, after = AGENDA_STYLES[style]
+        while size > 22 and G.text_width(G.get_font(fname, size), text) > content_w:
+            size -= 2
+        font = G.get_font(fname, size)
+        draw.text((x, y), text, font=font, fill=colmap[ckey], anchor="la")
+        y += G.line_height(font) + after
+
+    # firma centrata in basso, senza logo: come nel reel pinnato
+    footer_font = G.get_font(G.FONT_MEDIUM, 30)
+    draw.text((W // 2, H - BOTTOM_SAFE + 60), G.OFFICIAL_HANDLE,
+              font=footer_font, fill=colmap["accent1"], anchor="ma")
+
+    return base.convert("RGB")
 
 
 def render_card(colors, lines, label=None):
@@ -181,6 +238,11 @@ def main():
     palette = G.load_palette()
     os.makedirs(G.OUTPUT_DIR, exist_ok=True)
 
+    # colori aggiuntivi presi comunque DALLA palette (mai inventati): l'oro e
+    # l'azzurro vivono sotto altre categorie ma servono trasversalmente.
+    extra = {"gold": palette["live_music"]["accent2"],
+             "sky": palette["live_music"]["accent1"]}
+
     for reel in spec:
         cards = []
         for c in reel["cards"]:
@@ -192,12 +254,16 @@ def main():
                 c.get("categoria", reel["categoria"]),
                 c.get("variante", reel.get("variante")),
             )
-            # etichetta: per default quella della categoria della card
-            # (LIVE MUSIC / SERATA / APERITIVO / DJ SET), sovrascrivibile con
-            # "label", o disattivabile con "label": null sulle card di servizio
-            label = c["label"] if "label" in c else colors["label"]
-            cards.append({"img": render_card(colors, c["lines"], label),
-                          "dur": c["dur"]})
+            layout = c.get("layout", reel.get("layout", "center"))
+            if layout == "agenda":
+                img = render_agenda_card(colors, c["lines"], extra)
+            else:
+                # etichetta: per default quella della categoria della card
+                # (LIVE MUSIC / SERATA / APERITIVO / DJ SET), sovrascrivibile con
+                # "label", o disattivabile con "label": null sulle card di servizio
+                label = c["label"] if "label" in c else colors["label"]
+                img = render_card(colors, c["lines"], label)
+            cards.append({"img": img, "dur": c["dur"]})
         out = os.path.join(G.OUTPUT_DIR, f'{reel["slug"]}_reel.mp4')
         dur = build_video(cards, out, G.OUTPUT_DIR)
         print(f"OK  {out}  ({dur}s, {len(cards)} card)")
