@@ -36,7 +36,14 @@ STYLES = {
 GAP = 34
 
 
-def render_card(colors, lines):
+PILL_FONT_SIZE = 36
+PILL_PAD_X, PILL_PAD_Y = 40, 20
+PILL_GAP = 52          # respiro tra etichetta e blocco testo
+
+
+def render_card(colors, lines, label=None):
+    """label: testo dell'etichetta (pill). None = nessuna etichetta, utile
+    sulle card di servizio (riga in inglese, CTA) che non sono eventi."""
     base = Image.new("RGBA", (W, H), colors["bg"])
     base = G.draw_watermark(base, colors)
     draw = ImageDraw.Draw(base)
@@ -58,9 +65,28 @@ def render_card(colors, lines):
                       "color": colmap[ckey], "h": G.line_height(font)})
 
     stack = sum(i["h"] for i in items) + GAP * (len(items) - 1)
+
+    pill = None
+    if label:
+        pf = G.get_font(G.FONT_BOLD, PILL_FONT_SIZE)
+        text = label.upper()
+        pill = {"font": pf, "text": text,
+                "w": G.text_width(pf, text) + 2 * PILL_PAD_X,
+                "h": G.line_height(pf) + 2 * PILL_PAD_Y}
+        stack += pill["h"] + PILL_GAP
+
     top = MARGIN + 140
     bottom = H - BOTTOM_SAFE - 120
     y = top + max(0, (bottom - top - stack) // 2)
+
+    if pill:
+        x0 = W // 2 - pill["w"] // 2
+        draw.rounded_rectangle(
+            [x0, y, x0 + pill["w"], y + pill["h"]],
+            radius=pill["h"] // 2, fill=colors["pill_bg"])
+        draw.text((W // 2, y + pill["h"] // 2), pill["text"],
+                  font=pill["font"], fill=colors["pill_text"], anchor="mm")
+        y += pill["h"] + PILL_GAP
 
     for it in items:
         draw.text((W // 2, y), it["text"], font=it["font"],
@@ -166,7 +192,11 @@ def main():
                 c.get("categoria", reel["categoria"]),
                 c.get("variante", reel.get("variante")),
             )
-            cards.append({"img": render_card(colors, c["lines"]),
+            # etichetta: per default quella della categoria della card
+            # (LIVE MUSIC / SERATA / APERITIVO / DJ SET), sovrascrivibile con
+            # "label", o disattivabile con "label": null sulle card di servizio
+            label = c["label"] if "label" in c else colors["label"]
+            cards.append({"img": render_card(colors, c["lines"], label),
                           "dur": c["dur"]})
         out = os.path.join(G.OUTPUT_DIR, f'{reel["slug"]}_reel.mp4')
         dur = build_video(cards, out, G.OUTPUT_DIR)
