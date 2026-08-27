@@ -404,12 +404,14 @@ def build_elements(evento, colors, fmt, content_width):
     luogo_font = get_font(FONT_MEDIUM, sizes["luogo"])
     locale = (evento.get("locale") or "").strip()
     if locale:
+        # nome del locale in evidenza: piu' grande e in grassetto
+        locale_font = get_font(FONT_BOLD, sizes["luogo"] + 8)
         town_font = get_font(FONT_REGULAR, sizes["contesto"])
         inner = 12
         elements.append({
             "type": "location", "inner": inner,
-            "height": line_height(luogo_font) + inner + line_height(town_font),
-            "main": {"text": locale, "font": luogo_font,
+            "height": line_height(locale_font) + inner + line_height(town_font),
+            "main": {"text": locale, "font": locale_font,
                      "color": colors["text"]},
             "sub": {"text": evento["luogo"], "font": town_font,
                     "color": acc1},
