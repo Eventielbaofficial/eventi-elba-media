@@ -1,17 +1,26 @@
 {
   "live_music": {
     "label": "LIVE MUSIC",
-    "bg": "#2C4568",
+    "bg": "#162D42",
     "accent1": "#AEC9E8",
-    "accent2": "#F2C14E",
+    "accent2": "#FF6B4A",
     "text": "#F4EFE4",
     "pill_bg": "#AEC9E8",
-    "pill_text": "#2C4568"
+    "pill_text": "#162D42",
+    "alt": {
+      "label": "LIVE MUSIC",
+      "bg": "#AEC9E8",
+      "accent1": "#2C4568",
+      "accent2": "#E86A34",
+      "text": "#162D42",
+      "pill_bg": "#162D42",
+      "pill_text": "#AEC9E8"
+    }
   },
   "dj_set_serata": {
     "label": "SERATA",
     "bg": "#162D42",
-    "accent1": "#86A6D3",
+    "accent1": "#AEC9E8",
     "accent2": "#FF6B4A",
     "text": "#F4EFE4",
     "pill_bg": "#AEC9E8",
@@ -46,11 +55,20 @@
   },
   "festa_special": {
     "label": "FESTA",
-    "bg": "#3A2F55",
-    "accent1": "#B9A6E0",
-    "accent2": "#F2C14E",
-    "text": "#F4EFE4",
-    "pill_bg": "#B9A6E0",
-    "pill_text": "#3A2F55"
+    "bg": "#E86A34",
+    "accent1": "#5C3115",
+    "accent2": "#F4E4C1",
+    "text": "#F4E4C1",
+    "pill_bg": "#F4E4C1",
+    "pill_text": "#5C3115",
+    "alt": {
+      "label": "FESTA",
+      "bg": "#F4E4C1",
+      "accent1": "#E86A34",
+      "accent2": "#F2C14E",
+      "text": "#5C3115",
+      "pill_bg": "#E86A34",
+      "pill_text": "#F4E4C1"
+    }
   }
 }
