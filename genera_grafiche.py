@@ -42,6 +42,22 @@ FONT_REGULAR = "Poppins-Regular.ttf"
 
 OFFICIAL_HANDLE = "@eventi.elba.official"
 
+# Fascia "claim" nel footer: l'unico messaggio che sopravvive al repost del
+# locale in storia (dove la caption non e' visibile). Ruota tra tre obiettivi
+# diversi per non diventare carta da parati.
+#   A = appuntamento ricorrente  -> turisti / follower
+#   B = presidio tutto l'anno    -> local, zoccolo duro
+#   C = porta aperta ai locali   -> collaborazioni
+# Forzabile per evento col campo "claim": "A"|"B"|"C"|"none"|<testo libero>.
+CLAIM_ENABLED = True
+CLAIMS = {
+    "A": "OGNI GIOVEDÌ LA GUIDA AL WEEKEND",
+    "B": "GLI EVENTI DELL'ELBA, TUTTO L'ANNO",
+    "C": "IL TUO EVENTO QUI · SCRIVICI IN DM",
+}
+CLAIM_ORDER = ("A", "B", "C")
+CLAIM_TRACKING = 3        # spaziatura tra lettere, da' presenza senza peso
+
 # Decorazioni geometriche di categoria (onde/raggi/linee/stelle).
 # Disattivate: la filigrana logo-mark fa da unico elemento di sfondo.
 GEOMETRIC_DECOR = False
@@ -495,9 +511,58 @@ def draw_elements(draw, elements, start_y, fmt, colors, content_left,
     return y
 
 
-def draw_footer(draw, evento, fmt, colors, content_left):
+def resolve_claim(evento, index):
+    """Testo della fascia claim: forzato dal campo "claim" (sigla, testo
+    libero o "none"), altrimenti a rotazione automatica sull'indice."""
+    raw = (evento.get("claim") or "").strip()
+    if raw:
+        key = raw.upper()
+        if key in ("NONE", "OFF", "-"):
+            return None
+        if key in CLAIMS:
+            return CLAIMS[key]
+        return raw.upper()                       # testo libero personalizzato
+    if not CLAIM_ENABLED:
+        return None
+    return CLAIMS[CLAIM_ORDER[index % len(CLAIM_ORDER)]]
+
+
+def tracked_width(font, text, tracking):
+    if not text:
+        return 0
+    return int(sum(font.getlength(c) for c in text) + tracking * (len(text) - 1))
+
+
+def draw_tracked(draw, xy, text, font, fill, tracking):
+    """Testo con spaziatura tra le lettere (PIL non la supporta nativamente)."""
+    x, y = xy
+    for ch in text:
+        draw.text((x, y), ch, font=font, fill=fill, anchor="la")
+        x += font.getlength(ch) + tracking
+
+
+def draw_claim(draw, text, fmt, colors, content_left, baseline_top,
+               content_width):
+    """Claim sopra il footer: testo solo, maiuscolo e spaziato, nell'accento
+    di contrasto. Niente fondino: la gerarchia la fanno colore e tracking,
+    non il peso. Ritorna la y del bordo superiore."""
+    size = fmt["sizes"]["footer"] - 2
+    font = get_font(FONT_BOLD, size)
+    while size > 16 and tracked_width(font, text, CLAIM_TRACKING) > content_width:
+        size -= 2
+        font = get_font(FONT_BOLD, size)
+
+    th = line_height(font)
+    top = baseline_top - int(th * 1.9)
+    draw_tracked(draw, (content_left, top), text, font,
+                 readable_accent("accent2", colors), CLAIM_TRACKING)
+    return top
+
+
+def draw_footer(draw, evento, fmt, colors, content_left, content_width,
+                index=0):
     """@eventi.elba.official sempre in basso a sinistra; handle_locale sopra
-    se presente. Ritorna la y piu' alta occupata dal footer."""
+    se presente, fascia claim sopra tutto. Ritorna la y piu' alta occupata."""
     footer_font = get_font(FONT_MEDIUM, fmt["sizes"]["footer"])
     fh = line_height(footer_font)
     W, H = fmt["size"]
@@ -513,6 +578,11 @@ def draw_footer(draw, evento, fmt, colors, content_left):
         draw.text((content_left, handle_top), handle, font=footer_font,
                   fill=colors["accent1"], anchor="la")
         top = handle_top
+
+    claim = resolve_claim(evento, index)
+    if claim:
+        top = draw_claim(draw, claim, fmt, colors, content_left, top,
+                         content_width)
 
     return top
 
@@ -561,7 +631,8 @@ def render(evento, palette, fmt_name, index=0):
     base.paste(logo, (logo_x, logo_y), logo)     # alpha = trasparenza
 
     # footer in basso a sinistra
-    footer_top = draw_footer(draw, evento, fmt, colors, content_left)
+    footer_top = draw_footer(draw, evento, fmt, colors, content_left,
+                             content_width, index)
 
     # blocco contenuti centrato tra il margine alto e footer/logo
     elements = build_elements(evento, colors, fmt, content_width)
@@ -667,8 +738,10 @@ def main():
         slug = slugify(evento["nome"])
         for fmt_name in ("post", "story"):
             img = render(evento, palette, fmt_name, index)
-            out = os.path.join(OUTPUT_DIR, f"{slug}_{fmt_name}.png")
-            img.save(out, "PNG")
+            # JPEG diretto: e' il formato che vuole Instagram, evita il
+            # passaggio di conversione e non lascia doppioni in output/.
+            out = os.path.join(OUTPUT_DIR, f"{slug}_{fmt_name}.jpg")
+            img.save(out, "JPEG", quality=92, subsampling=0, optimize=True)
             print(f"OK  {out}")
 
         cap_path = os.path.join(OUTPUT_DIR, f"{slug}_caption.txt")
