@@ -98,6 +98,11 @@ TITLE_MAX_SCALE = 2.2
 # sticker, menzioni e testo aggiunti a mano in app.
 TITLE_FIXED_POST = 180
 
+# Il sottotitolo sta sotto al titolo di un gradino netto, non alla sua stessa
+# misura. Su un post da 180 fa 99, cioè sopra la riga della data (46) ma senza
+# competere col nome. Vedi fit_title_block().
+SUBTITLE_RATIO = 0.55
+
 # Emoji + vibe per categoria (usati SOLO nella caption di testo)
 CATEGORY_META = {
     "live_music": {"emoji": "🎶", "emoji2": "🎤",
@@ -285,25 +290,36 @@ def fit_title_block(nome, sotto, base_size, max_width,
     titoli corti restavano piccoli e lasciavano mezza grafica vuota. Qui si
     cresce fino a riempire la riga, come nel reel Piglio Foho.
 
-    Dimensiona anche il **sottotitolo**, che prima veniva appeso senza nessun
-    controllo di larghezza: era la causa nota degli sfori nel 9:16.
+    Il **sottotitolo sta un gradino sotto** (SUBTITLE_RATIO) e si dimensiona da
+    solo. Prima condivideva il font del titolo, quindi una lineup lunga tirava
+    giù anche il nome: Listening Party finiva a 144 e Nene e Coco a 120, contro
+    i 180 di regola. Deciso il 5/09: il titolo tiene la sua misura, se qualcosa
+    deve cedere è il sottotitolo.
+
+    Restituisce (font_titolo, righe) dove ogni riga è (testo, font).
     """
     if max_size is None:
         max_size = int(base_size * TITLE_MAX_SCALE)
     if max_lines is None:
         max_lines = 2 if sotto else 3
 
+    def sub_row(title_size):
+        """Sottotitolo a SUBTITLE_RATIO del titolo, ridotto solo se sfora."""
+        size = max(24, int(title_size * SUBTITLE_RATIO))
+        while size > 24 and text_width(get_font(FONT_BOLD, size),
+                                       sotto) > max_width:
+            size -= 2
+        return (sotto, get_font(FONT_BOLD, size))
+
     best = None
     size = min_size
     while size <= max_size:
         font = get_font(FONT_TITLE, size)
         lines = wrap_lines(font, nome, max_width)
-        ok = (len(lines) <= max_lines
-              and all(text_width(font, ln) <= max_width for ln in lines))
-        if ok and sotto:
-            ok = text_width(font, sotto) <= max_width
-        if ok:
-            best = (font, lines + ([sotto] if sotto else []))
+        if (len(lines) <= max_lines
+                and all(text_width(font, ln) <= max_width for ln in lines)):
+            best = (font, [(ln, font) for ln in lines]
+                    + ([sub_row(size)] if sotto else []))
         elif best is not None:
             break                      # oltre questa misura non si torna a stare
         size += 4
@@ -312,7 +328,8 @@ def fit_title_block(nome, sotto, base_size, max_width,
         return best
     font = get_font(FONT_TITLE, min_size)
     lines = wrap_lines(font, nome, max_width)
-    return font, lines + ([sotto] if sotto else [])
+    return font, ([(ln, font) for ln in lines]
+                  + ([sub_row(min_size)] if sotto else []))
 
 
 # --------------------------------------------------------------------------- #
@@ -448,12 +465,13 @@ def build_elements(evento, colors, fmt, content_width, title_max=None):
         sizes["title"], content_width, max_size=title_max,
     )
     line_gap = 1.06
-    tlh = line_height(title_font)
-    title_h = int(len(title_lines) * tlh * line_gap)
+    # ogni riga ha il suo passo: il sottotitolo è più piccolo del titolo e non
+    # deve portarsi dietro l'interlinea del nome
+    title_h = sum(int(line_height(f) * line_gap) for _, f in title_lines)
     elements.append({
         "type": "title", "height": title_h,
         "font": title_font, "lines": title_lines,
-        "line_h": tlh, "line_gap": line_gap,
+        "line_gap": line_gap,
     })
 
     # separatore
@@ -531,11 +549,10 @@ def draw_elements(draw, elements, start_y, fmt, colors, content_left,
 
         elif el["type"] == "title":
             ty = y
-            step = int(el["line_h"] * el["line_gap"])
-            for ln in el["lines"]:
-                draw.text((anchor_x, ty), ln, font=el["font"],
+            for ln, lf in el["lines"]:
+                draw.text((anchor_x, ty), ln, font=lf,
                           fill=colors["text"], anchor=line_anchor)
-                ty += step
+                ty += int(line_height(lf) * el["line_gap"])
 
         elif el["type"] == "separator":
             x0 = (center_x - el["width"] // 2) if align == "center" \
