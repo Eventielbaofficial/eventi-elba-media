@@ -84,6 +84,20 @@ ACCENT_MIN_CONTRAST = 1.8
 # aperitivo arancione. Forzabile per evento col campo "variante": base|alt.
 ALTERNATE_INVERT = True
 
+# Titolo: quanto può CRESCERE oltre la misura base per riempire la riga.
+# Voluto dall'utente il 2/09 guardando il reel Piglio Foho: "a colpo d'occhio
+# è migliore". Prima il titolo poteva solo rimpicciolire, quindi i nomi corti
+# restavano piccoli in mezzo a una grafica vuota.
+TITLE_MAX_SCALE = 2.2
+
+# Misura FISSA del titolo sui post (e sui reel, vedi genera_reel.py).
+# Correzione dell'utente il 4/09: con la sola regola del 2/09 la misura finale
+# ballava tra 136 e 192 a seconda della lunghezza del nome, e in griglia si
+# vedeva. 180 è la misura del post Restauro Music del 2/09, che ha approvato.
+# Le STORIE restano alla misura base (più piccola): gli serve tela libera per
+# sticker, menzioni e testo aggiunti a mano in app.
+TITLE_FIXED_POST = 180
+
 # Emoji + vibe per categoria (usati SOLO nella caption di testo)
 CATEGORY_META = {
     "live_music": {"emoji": "🎶", "emoji2": "🎤",
@@ -263,6 +277,44 @@ def fit_title(text, base_size, max_width, min_size=48):
     return font, wrap_lines(font, text, max_width)
 
 
+def fit_title_block(nome, sotto, base_size, max_width,
+                    min_size=48, max_size=None, max_lines=None):
+    """Titolo (+ sottotitolo) alla misura PIÙ GRANDE che sta nella larghezza.
+
+    `fit_title` poteva solo rimpicciolire a partire da `base_size`, quindi i
+    titoli corti restavano piccoli e lasciavano mezza grafica vuota. Qui si
+    cresce fino a riempire la riga, come nel reel Piglio Foho.
+
+    Dimensiona anche il **sottotitolo**, che prima veniva appeso senza nessun
+    controllo di larghezza: era la causa nota degli sfori nel 9:16.
+    """
+    if max_size is None:
+        max_size = int(base_size * TITLE_MAX_SCALE)
+    if max_lines is None:
+        max_lines = 2 if sotto else 3
+
+    best = None
+    size = min_size
+    while size <= max_size:
+        font = get_font(FONT_TITLE, size)
+        lines = wrap_lines(font, nome, max_width)
+        ok = (len(lines) <= max_lines
+              and all(text_width(font, ln) <= max_width for ln in lines))
+        if ok and sotto:
+            ok = text_width(font, sotto) <= max_width
+        if ok:
+            best = (font, lines + ([sotto] if sotto else []))
+        elif best is not None:
+            break                      # oltre questa misura non si torna a stare
+        size += 4
+
+    if best is not None:
+        return best
+    font = get_font(FONT_TITLE, min_size)
+    lines = wrap_lines(font, nome, max_width)
+    return font, lines + ([sotto] if sotto else [])
+
+
 # --------------------------------------------------------------------------- #
 # Elementi decorativi di sfondo (coerenti con la categoria, sotto al testo)
 # --------------------------------------------------------------------------- #
@@ -370,7 +422,7 @@ def draw_watermark(base, colors):
 # --------------------------------------------------------------------------- #
 # Costruzione blocchi di contenuto (fasce verticali)
 # --------------------------------------------------------------------------- #
-def build_elements(evento, colors, fmt, content_width):
+def build_elements(evento, colors, fmt, content_width, title_max=None):
     sizes = fmt["sizes"]
     elements = []
     # accenti garantiti leggibili sullo sfondo (evita l'oro che sparisce)
@@ -389,12 +441,12 @@ def build_elements(evento, colors, fmt, content_width):
         "font": pill_font, "text": pill_label,
     })
 
-    # titolo (+ eventuale sottotitolo)
-    title_font, title_lines = fit_title(
-        evento["nome"].upper(), sizes["title"], content_width
+    # titolo (+ eventuale sottotitolo), dimensionati insieme
+    title_font, title_lines = fit_title_block(
+        evento["nome"].upper(),
+        (evento.get("sottotitolo") or "").strip().upper(),
+        sizes["title"], content_width, max_size=title_max,
     )
-    if evento.get("sottotitolo"):
-        title_lines = title_lines + [evento["sottotitolo"].upper()]
     line_gap = 1.06
     tlh = line_height(title_font)
     title_h = int(len(title_lines) * tlh * line_gap)
@@ -634,13 +686,30 @@ def render(evento, palette, fmt_name, index=0):
     footer_top = draw_footer(draw, evento, fmt, colors, content_left,
                              content_width, index)
 
-    # blocco contenuti centrato tra il margine alto e footer/logo
-    elements = build_elements(evento, colors, fmt, content_width)
-    stack_h = sum(e["height"] for e in elements) + fmt["gap"] * (len(elements) - 1)
-
+    # blocco contenuti centrato tra il margine alto e footer/logo.
+    # Il titolo ora cresce, quindi si verifica che la pila ci stia in ALTEZZA:
+    # se sfora si rimpicciolisce il titolo finché rientra.
     region_top = margin + fmt["gap"]
     region_bottom = min(footer_top, logo_y) - fmt["gap"]
-    start_y = region_top + max(0, (region_bottom - region_top - stack_h) // 2)
+    region_h = region_bottom - region_top
+
+    # Post: misura fissa uguale per tutti, così il feed resta coerente in
+    # griglia. Storie: misura base, non cresce, per lasciare spazio libero agli
+    # sticker. Entrambe le scelte sono dell'utente (4/09) — vedi CLAUDE.md.
+    if fmt_name == "story":
+        title_max = fmt["sizes"]["title"]
+    else:
+        title_max = TITLE_FIXED_POST
+    while True:
+        elements = build_elements(evento, colors, fmt, content_width,
+                                  title_max=title_max)
+        stack_h = (sum(e["height"] for e in elements)
+                   + fmt["gap"] * (len(elements) - 1))
+        if stack_h <= region_h or title_max <= 52:
+            break
+        title_max -= 6
+
+    start_y = region_top + max(0, (region_h - stack_h) // 2)
 
     draw_elements(draw, elements, start_y, fmt, colors,
                   content_left, content_width)
